@@ -1,103 +1,98 @@
-#include <SDL2/SDL.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <cmath>
+#include <vector>
 #include <iostream>
+#include <cmath>
+#include <CL/opencl.hpp>
+#include <GL/glut.h>
+// OpenCL és OpenGL globális változók
+cl::Context context;
+cl::CommandQueue queue;
+cl::Program program;
+cl::Buffer x_buffer, y_buffer;
 
-// Ablak méretei
-const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 600;
+std::vector<float> x_values, y_values;
+const int num_points = 2000;
 
-// Zoom állapota
-float zoom = 1.0f;
-
-void drawFunction()
+void initOpenCL()
 {
-  glBegin(GL_LINE_STRIP);
-  for (float x = -10.0f; x <= 10.0f; x += 0.01f)
-  {
-    float y = x * x;
-    glVertex2f(x, y);
-  }
-  glEnd();
+  // Platform és eszköz kiválasztása
+  std::vector<cl::Platform> platforms;
+  cl::Platform::get(&platforms);
+  cl::Platform platform = platforms.front();
+
+  std::vector<cl::Device> devices;
+  platform.getDevices(CL_DEVICE_TYPE_GPU, &devices);
+  cl::Device device = devices.front();
+
+  context = cl::Context(device);
+  queue = cl::CommandQueue(context, device);
+
+  // Kernel betöltése
+  std::string kernel_code = R"(
+        __kernel void calculate_y(__global const float* x_values, __global float* y_values, const int size) {
+            int i = get_global_id(0);
+            if (i < size) {
+                y_values[i] = x_values[i] * x_values[i];
+            }
+        }
+    )";
+
+  cl::Program::Sources sources(1, std::make_pair(kernel_code.c_str(), kernel_code.length()));
+  program = cl::Program(context, sources);
+  program.build("-cl-std=CL1.2");
 }
 
-int main(int argc, char *argv[])
+void calculateValues()
 {
-  if (SDL_Init(SDL_INIT_VIDEO) < 0)
+  // X értékek inicializálása
+  x_values.resize(num_points);
+  y_values.resize(num_points);
+  for (int i = 0; i < num_points; ++i)
   {
-    std::cerr << "Nem sikerült inicializálni az SDL-t: " << SDL_GetError() << std::endl;
-    return -1;
+    x_values[i] = -10.0f + i * 20.0f / num_points;
   }
 
-  SDL_Window *window = SDL_CreateWindow(
-      "Parabola rajzolása",
-      SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-      WINDOW_WIDTH, WINDOW_HEIGHT,
-      SDL_WINDOW_OPENGL);
+  // OpenCL buffer létrehozása
+  x_buffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * x_values.size(), x_values.data());
+  y_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * y_values.size());
 
-  if (!window)
+  // Kernel futtatása
+  cl::Kernel kernel(program, "calculate_y");
+  kernel.setArg(0, x_buffer);
+  kernel.setArg(1, y_buffer);
+  kernel.setArg(2, (int)x_values.size());
+
+  queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_points));
+  queue.enqueueReadBuffer(y_buffer, CL_TRUE, 0, sizeof(float) * y_values.size(), y_values.data());
+}
+
+void display()
+{
+  glClear(GL_COLOR_BUFFER_BIT);
+  glBegin(GL_LINE_STRIP);
+  for (size_t i = 0; i < x_values.size(); ++i)
   {
-    std::cerr << "Nem sikerült létrehozni az ablakot: " << SDL_GetError() << std::endl;
-    SDL_Quit();
-    return -1;
+    glVertex2f(x_values[i], y_values[i]);
   }
+  glEnd();
+  glutSwapBuffers();
+}
 
-  SDL_GLContext context = SDL_GL_CreateContext(window);
-  if (!context)
-  {
-    std::cerr << "Nem sikerült létrehozni az OpenGL kontextust: " << SDL_GetError() << std::endl;
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return -1;
-  }
+int main(int argc, char **argv)
+{
+  // OpenCL inicializálása
+  initOpenCL();
+  calculateValues();
 
+  // OpenGL inicializálása
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+  glutInitWindowSize(800, 600);
+  glutCreateWindow("OpenCL + OpenGL: y = x^2");
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  gluOrtho2D(-10.0, 10.0, -10.0, 10.0);
+  gluOrtho2D(-10, 10, -10, 100);
 
-  glMatrixMode(GL_MODELVIEW);
-
-  bool running = true;
-  SDL_Event event;
-
-  while (running)
-  {
-    // Eseménykezelés
-    while (SDL_PollEvent(&event))
-    {
-      if (event.type == SDL_QUIT)
-      {
-        running = false;
-      }
-      else if (event.type == SDL_MOUSEWHEEL)
-      {
-        if (event.wheel.y > 0)
-        {
-          zoom *= 0.9f; // Zoom befelé
-        }
-        else if (event.wheel.y < 0)
-        {
-          zoom *= 1.1f; // Zoom kifelé
-        }
-      }
-    }
-
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // Zoomolás
-    glLoadIdentity();
-    glScalef(zoom, zoom, 1.0f);
-
-    glColor3f(1.0f, 0.0f, 0.0f);
-    drawFunction();
-
-    SDL_GL_SwapWindow(window);
-  }
-
-  SDL_GL_DeleteContext(context);
-  SDL_DestroyWindow(window);
-  SDL_Quit();
-
+  glutDisplayFunc(display);
+  glutMainLoop();
   return 0;
 }
