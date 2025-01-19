@@ -29,10 +29,11 @@ void initOpenCL()
 
   // Kernel betöltése
   std::string kernel_code = R"(
-        __kernel void calculate_y(__global const float* x_values, __global float* y_values, const int size) {
+        __kernel void calculate_y(__global float* x_values, __global float* y_values, const int size) {
             int i = get_global_id(0);
             if (i < size) {
-                y_values[i] = x_values[i] * x_values[i];
+                x_values[i] = -10.0f + i * 20.0f / size;
+                y_values[i] = x_values[i] *  x_values[i];
             }
         }
     )";
@@ -44,16 +45,11 @@ void initOpenCL()
 
 void calculateValues()
 {
-  // X értékek inicializálása
   x_values.resize(num_points);
   y_values.resize(num_points);
-  for (int i = 0; i < num_points; ++i)
-  {
-    x_values[i] = -10.0f + i * 20.0f / num_points;
-  }
 
   // OpenCL buffer létrehozása
-  x_buffer = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * x_values.size(), x_values.data());
+  x_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float) * x_values.size());
   y_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * y_values.size());
 
   // Kernel futtatása
@@ -64,6 +60,7 @@ void calculateValues()
 
   queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_points));
   queue.enqueueReadBuffer(y_buffer, CL_TRUE, 0, sizeof(float) * y_values.size(), y_values.data());
+  queue.enqueueReadBuffer(x_buffer, CL_TRUE, 0, sizeof(float) * x_values.size(), x_values.data());
 }
 
 void display()
