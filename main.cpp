@@ -69,7 +69,7 @@ void display()
   glBegin(GL_LINE_STRIP);
   for (size_t i = 0; i < x_values.size(); ++i)
   {
-    glColor3f(0.2, 0.5, 0.2);
+    glColor3f(0.5, 0.1, 0.2);
     glVertex2f(x_values[i], y_values[i]);
   }
   glEnd();
