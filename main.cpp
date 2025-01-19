@@ -1,5 +1,6 @@
 #include <vector>
 #include <iostream>
+// #include <complex>
 #include <cmath>
 #include <CL/opencl.hpp>
 #include <GL/glut.h>
@@ -36,7 +37,7 @@ void initOpenCL()
         }
     )";
 
-  cl::Program::Sources sources(1, std::make_pair(kernel_code.c_str(), kernel_code.length()));
+  std::vector<std::string> sources(1, kernel_code);
   program = cl::Program(context, sources);
   program.build("-cl-std=CL1.2");
 }
@@ -71,6 +72,7 @@ void display()
   glBegin(GL_LINE_STRIP);
   for (size_t i = 0; i < x_values.size(); ++i)
   {
+    glColor3f(0.2, 0.5, 0.2);
     glVertex2f(x_values[i], y_values[i]);
   }
   glEnd();
