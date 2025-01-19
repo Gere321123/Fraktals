@@ -12,4 +12,4 @@ This project implements the **Madrow Set** using **C++** and **OpenGL** for dyna
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Gere321123/Fraktals.git
+   git clone https://github.com/Gere321123/fractals.git
