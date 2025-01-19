@@ -1,4 +1,4 @@
-# Madrow Set - C++ & OpenGL
+# Mandelbrot Set - C++ & OpenGL
 
 This project implements the **Madrow Set** using **C++** and **OpenGL** for dynamic and high-performance visualization.
 
