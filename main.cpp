@@ -1,6 +1,6 @@
 #include <vector>
 #include <iostream>
-// #include <complex>
+
 #include <cmath>
 #include <CL/opencl.hpp>
 #include <GL/glut.h>
@@ -8,10 +8,9 @@
 cl::Context context;
 cl::CommandQueue queue;
 cl::Program program;
-cl::Buffer x_buffer, y_buffer;
+cl::Buffer c_buffer;
 
-std::vector<float> x_values, y_values;
-const int num_points = 2000;
+std::vector<float2> c_values;
 
 void initOpenCL()
 {
@@ -29,12 +28,18 @@ void initOpenCL()
 
   // Kernel betöltése
   std::string kernel_code = R"(
-        __kernel void calculate_y(__global float* x_values, __global float* y_values, const int size) {
+        __kernel void calculate_y(__global float2* c_values, const float gap, const int num_points_per_dim) {
             int i = get_global_id(0);
-            if (i < size) {
-                x_values[i] = -10.0f + i * 20.0f / size;
-                y_values[i] = x_values[i] *  x_values[i];
-            }
+
+            int x_idx = i % num_points_per_dim;  
+            int y_idx = i / num_points_per_dim;  
+
+          
+            float real = -2.0f + x_idx * gap;
+            float imagen = -2.0f + y_idx * gap;
+
+          
+            c_values[id] = (float2)(real, imagen);
         }
     )";
 
@@ -45,22 +50,21 @@ void initOpenCL()
 
 void calculateValues()
 {
-  x_values.resize(num_points);
-  y_values.resize(num_points);
+  const float gap = 0.01f;
+  const int num_points_per_dim = static_cast<int>(4.0f / gap); // 4.0 az intervallum hossza (-2-től 2-ig)
+  const int num_points = num_points_per_dim * num_points_per_dim;
 
+  c_values.resize(num_points);
   // OpenCL buffer létrehozása
-  x_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float) * x_values.size());
-  y_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * y_values.size());
+  c_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float2) * c_values.size());
 
   // Kernel futtatása
   cl::Kernel kernel(program, "calculate_y");
-  kernel.setArg(0, x_buffer);
-  kernel.setArg(1, y_buffer);
-  kernel.setArg(2, (int)x_values.size());
+  kernel.setArg(0, c_buffer);
+  kernel.setArg(1, gap);
+  kernel.setArg(2, num_points_per_dim);
 
   queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_points));
-  queue.enqueueReadBuffer(y_buffer, CL_TRUE, 0, sizeof(float) * y_values.size(), y_values.data());
-  queue.enqueueReadBuffer(x_buffer, CL_TRUE, 0, sizeof(float) * x_values.size(), x_values.data());
 }
 
 void display()
