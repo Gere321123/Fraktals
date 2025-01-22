@@ -9,7 +9,7 @@ cl::Context context;
 cl::CommandQueue queue;
 cl::Program program;
 cl::Buffer c_buffer;
-
+cl::Buffer displays_buffer;
 struct float2
 {
   float x, y; // x és y komponens
@@ -18,13 +18,13 @@ struct float2
   float2(float x = 0, float y = 0) : x(x), y(y) {}
 
   // Operátor a komplex számok szorzásához
-  float2 operator*(const float2 &other)
+  float2 operator*(const float2 &other) const
   {
     return float2(x * other.x - y * other.y, x * other.y + y * other.x);
   }
 
   // Operátor a komplex számokhoz való hozzáadásához
-  float2 operator+(const float2 &other)
+  float2 operator+(const float2 &other) const
   {
     return float2(x + other.x, y + other.y);
   }
@@ -120,7 +120,6 @@ void calculateValues()
   queue.enqueueNDRangeKernel(kernel, cl::NullRange, global_size);
   queue.enqueueReadBuffer(displays_buffer, CL_TRUE, 0, sizeof(bool) * displays.size(), displays.data());
 }
-
 // void display()
 // {
 //   glClear(GL_COLOR_BUFFER_BIT);
