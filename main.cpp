@@ -10,8 +10,12 @@ cl::CommandQueue queue;
 cl::Program program;
 cl::Buffer c_buffer;
 
+struct float2
+{
+  float x;
+  float y;
+};
 std::vector<float2> c_values;
-
 void initOpenCL()
 {
   // Platform és eszköz kiválasztása
@@ -28,7 +32,7 @@ void initOpenCL()
 
   // Kernel betöltése
   std::string kernel_code = R"(
-        __kernel void calculate_y(__global float2* c_values, const float gap, const int num_points_per_dim) {
+        __kernel void fill_c(__global float2* c_values, const float gap, const int num_points_per_dim) {
             int i = get_global_id(0);
 
             int x_idx = i % num_points_per_dim;  
@@ -39,7 +43,7 @@ void initOpenCL()
             float imagen = -2.0f + y_idx * gap;
 
           
-            c_values[id] = (float2)(real, imagen);
+            c_values[i] = (float2)(real, imagen);
         }
     )";
 
@@ -59,26 +63,28 @@ void calculateValues()
   c_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float2) * c_values.size());
 
   // Kernel futtatása
-  cl::Kernel kernel(program, "calculate_y");
+  cl::Kernel kernel(program, "fill_c");
   kernel.setArg(0, c_buffer);
   kernel.setArg(1, gap);
   kernel.setArg(2, num_points_per_dim);
+  cl::NDRange global_size(num_points);
 
-  queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(num_points));
+  queue.enqueueNDRangeKernel(kernel, cl::NullRange, global_size);
+  queue.enqueueReadBuffer(c_buffer, CL_TRUE, 0, sizeof(float2) * c_values.size(), c_values.data());
 }
 
-void display()
-{
-  glClear(GL_COLOR_BUFFER_BIT);
-  glBegin(GL_LINE_STRIP);
-  for (size_t i = 0; i < x_values.size(); ++i)
-  {
-    glColor3f(0.5, 0.1, 0.2);
-    glVertex2f(x_values[i], y_values[i]);
-  }
-  glEnd();
-  glutSwapBuffers();
-}
+// void display()
+// {
+//   glClear(GL_COLOR_BUFFER_BIT);
+//   glBegin(GL_LINE_STRIP);
+//   for (size_t i = 0; i < x_values.size(); ++i)
+//   {
+//     glColor3f(0.5, 0.1, 0.2);
+//     glVertex2f(x_values[i], y_values[i]);
+//   }
+//   glEnd();
+//   glutSwapBuffers();
+// }
 
 int main(int argc, char **argv)
 {
@@ -87,15 +93,15 @@ int main(int argc, char **argv)
   calculateValues();
 
   // OpenGL inicializálása
-  glutInit(&argc, argv);
-  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-  glutInitWindowSize(800, 600);
-  glutCreateWindow("OpenCL + OpenGL: y = x^2");
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluOrtho2D(-10, 10, -10, 100);
+  // glutInit(&argc, argv);
+  // glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+  // glutInitWindowSize(800, 600);
+  // glutCreateWindow("OpenCL + OpenGL: y = x^2");
+  // glMatrixMode(GL_PROJECTION);
+  // glLoadIdentity();
+  // gluOrtho2D(-10, 10, -10, 100);
 
-  glutDisplayFunc(display);
-  glutMainLoop();
+  // glutDisplayFunc(display);
+  // glutMainLoop();
   return 0;
 }

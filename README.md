@@ -20,5 +20,4 @@ run
 g++ coplex.cpp -o complex -lsfml-graphics -lsfml-window -lsfml-system
 ./complex
 or 
-g++ main.cpp -o example -lOpenCL -lGL -lGLU -lglut
 ./main
