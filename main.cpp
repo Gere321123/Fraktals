@@ -4,6 +4,11 @@
 #include <CL/opencl.hpp>
 #include <GL/glut.h>
 
+// Constants for window dimensions
+const int WINDOW_WIDTH = 800;
+const int WINDOW_HEIGHT = 800;
+const float gap = 0.01;
+const int num_points_per_dim = static_cast<int>(4.0f / gap);
 // OpenCL és OpenGL globális változók
 cl::Context context;
 cl::CommandQueue queue;
@@ -85,8 +90,6 @@ void initOpenCL()
 
 void calculateValues()
 {
-  const float gap = 0.01f;
-  const int num_points_per_dim = static_cast<int>(4.0f / gap); // 4.0 az intervallum hossza (-2-től 2-ig)
   const int num_points = num_points_per_dim * num_points_per_dim;
 
   c_values.resize(num_points);
@@ -108,13 +111,70 @@ void calculateValues()
   queue.enqueueReadBuffer(displays_buffer, CL_TRUE, 0, sizeof(char) * displays.size(), displays.data());
 }
 
+void display()
+{
+  glClear(GL_COLOR_BUFFER_BIT);
+  glBegin(GL_POINTS); // Render individual pixels as points
+
+  // Loop through all points in the grid
+  for (int y = 0; y < num_points_per_dim; ++y)
+  {
+    for (int x = 0; x < num_points_per_dim; ++x)
+    {
+      int index = y * num_points_per_dim + x;
+
+      // Map the grid coordinates to OpenGL's coordinate space (-1 to 1)
+      float gl_x = -1.0f + 2.0f * (x / (float)num_points_per_dim);
+      float gl_y = -1.0f + 2.0f * (y / (float)num_points_per_dim);
+
+      // Set color based on whether the point escaped or not
+      if (displays[index])
+      {
+        glColor3f(1.0f, 0.0f, 0.0f); // Red for points inside the set
+      }
+      else
+      {
+        glColor3f(0.0f, 0.0f, 0.0f); // Black for points outside the set
+      }
+
+      glVertex2f(gl_x, gl_y);
+    }
+  }
+
+  glEnd();
+  glutSwapBuffers(); // Swap buffers to display the rendered image
+}
+
+void initOpenGL()
+{
+  // Set up the OpenGL environment
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluOrtho2D(-1.0, 1.0, -1.0, 1.0); // Set the coordinate system to range [-1, 1]
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Set the background color to black
+}
+
 int main(int argc, char **argv)
 {
-  // OpenCL inicializálása
+  // OpenCL initialization and calculation
   initOpenCL();
   calculateValues();
 
-  // Additional OpenGL code (if required)
+  // OpenGL initialization
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+  glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+  glutCreateWindow("Mandelbrot Set Visualization");
+
+  initOpenGL();
+
+  // Set the display function
+  glutDisplayFunc(display);
+
+  // Start the main loop
+  glutMainLoop();
 
   return 0;
 }
