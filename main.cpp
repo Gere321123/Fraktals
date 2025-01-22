@@ -12,10 +12,36 @@ cl::Buffer c_buffer;
 
 struct float2
 {
-  float x;
-  float y;
+  float x, y; // x és y komponens
+
+  // Konstruktor
+  float2(float x = 0, float y = 0) : x(x), y(y) {}
+
+  // Operátor a komplex számok szorzásához
+  float2 operator*(const float2 &other)
+  {
+    return float2(x * other.x - y * other.y, x * other.y + y * other.x);
+  }
+
+  // Operátor a komplex számokhoz való hozzáadásához
+  float2 operator+(const float2 &other)
+  {
+    return float2(x + other.x, y + other.y);
+  }
 };
+
+float2 iterate(const float2 &z, const float2 &c)
+{
+  return (z * z) + c;
+}
+
+float2 abs(const float2 &z)
+{
+  return std::sqrt(z.x * z.x + z.y * z.y);
+}
+
 std::vector<float2> c_values;
+std::vector<bool> displays;
 void initOpenCL()
 {
   // Platform és eszköz kiválasztása
@@ -32,7 +58,7 @@ void initOpenCL()
 
   // Kernel betöltése
   std::string kernel_code = R"(
-        __kernel void fill_c(__global float2* c_values, const float gap, const int num_points_per_dim) {
+        __kernel void fill_c(__global float2* c_values, __global bool* displays, const float gap, const int num_points_per_dim) {
             int i = get_global_id(0);
 
             int x_idx = i % num_points_per_dim;  
@@ -44,6 +70,27 @@ void initOpenCL()
 
           
             c_values[i] = (float2)(real, imagen);
+
+            int iter = 0;
+
+            float2 z = (0.0f , 0.0f); 
+            bool escaped = false;
+
+            while (iter < 15){
+            z = iterate (z,c_values[i]);
+            
+            if (abs(z) < 2.0f){
+              escaped = true;
+              break;
+            }
+            iter ++;
+            }
+
+            if (escaped){
+              displays[i] = true;
+            }else{
+              displays[i] = false;
+            }
         }
     )";
 
@@ -51,7 +98,6 @@ void initOpenCL()
   program = cl::Program(context, sources);
   program.build("-cl-std=CL1.2");
 }
-
 void calculateValues()
 {
   const float gap = 0.01f;
@@ -59,18 +105,20 @@ void calculateValues()
   const int num_points = num_points_per_dim * num_points_per_dim;
 
   c_values.resize(num_points);
+  displays.resize(num_points);
   // OpenCL buffer létrehozása
   c_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(float2) * c_values.size());
-
+  displays_buffer = cl::Buffer(context, CL_MEM_WRITE_ONLY, sizeof(bool) * displays.size());
   // Kernel futtatása
   cl::Kernel kernel(program, "fill_c");
   kernel.setArg(0, c_buffer);
-  kernel.setArg(1, gap);
-  kernel.setArg(2, num_points_per_dim);
+  kernel.setArg(1, displays_buffer);
+  kernel.setArg(2, gap);
+  kernel.setArg(3, num_points_per_dim);
   cl::NDRange global_size(num_points);
 
   queue.enqueueNDRangeKernel(kernel, cl::NullRange, global_size);
-  queue.enqueueReadBuffer(c_buffer, CL_TRUE, 0, sizeof(float2) * c_values.size(), c_values.data());
+  queue.enqueueReadBuffer(displays_buffer, CL_TRUE, 0, sizeof(bool) * displays.size(), displays.data());
 }
 
 // void display()
