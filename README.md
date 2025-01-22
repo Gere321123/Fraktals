@@ -14,10 +14,3 @@ This project implements the **Madrow Set** using **C++** and **OpenGL** for dyna
    ```bash
    git clone https://github.com/Gere321123/fractals.git
 
-
-run 
-
-g++ coplex.cpp -o complex -lsfml-graphics -lsfml-window -lsfml-system
-./complex
-or 
-./main
