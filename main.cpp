@@ -6,7 +6,7 @@
 
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 800;
-const float gap = 0.01;
+const float gap = 0.001;
 const int num_points_per_dim = static_cast<int>(4.0f / gap);
 
 cl::Context context;
